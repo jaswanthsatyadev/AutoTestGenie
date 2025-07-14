@@ -84,7 +84,7 @@ async def generate_test(url: str = Form(...),
         7. Include setup and teardown methods
         8. Use explicit waits where appropriate
         
-        Return ONLY the Python code without any explanations.
+        Return ONLY the Python code without any explanations. Ensure the script is a valid pytest test file and includes at least one function starting with `def test_`.
         """
         
         # Generate the test script
@@ -98,9 +98,26 @@ async def generate_test(url: str = Form(...),
             test_script = test_script.split("```")[0]
         
         # Save the test script to a temporary file
-        test_file_path = TEMP_DIR / "test_script.py"
-        with open(test_file_path, "w") as f:
-            f.write(test_script)
+        test_file_path = TEMP_DIR / "test_selenium_script.py"
+        
+        # Check if the generated script contains a test function
+        if "def test_" not in test_script:
+            # If not, wrap the script in a test function that accepts a driver fixture
+            wrapped_script = f"""
+import pytest
+
+def test_selenium_automation(driver):
+    # Add a try-except block to catch exceptions during test execution
+    try:
+        {test_script}
+    except Exception as e:
+        pytest.fail(f"Test failed: {{e}}")
+"""
+            with open(test_file_path, "w") as f:
+                f.write(wrapped_script)
+        else:
+            with open(test_file_path, "w") as f:
+                f.write(test_script)
         
         return FileResponse(
             path=test_file_path,
@@ -116,9 +133,31 @@ async def generate_test(url: str = Form(...),
 async def run_test(background_tasks: BackgroundTasks, test_script: str = Form(...)):
     try:
         # Save the test script to a temporary file
-        test_file_path = TEMP_DIR / "test_script.py"
+        test_file_path = TEMP_DIR / "test_selenium_script.py"
         with open(test_file_path, "w") as f:
             f.write(test_script)
+        print(f"Content of {test_file_path}:\n{test_script}")
+
+        # Create conftest.py with a driver fixture
+        conftest_content = """
+import pytest
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+
+@pytest.fixture(scope='function')
+def driver():
+    options = Options()
+    options.add_argument('--headless')
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(options=options)
+    yield driver
+    driver.quit()
+"""
+        conftest_file_path = TEMP_DIR / "conftest.py"
+        with open(conftest_file_path, "w") as f:
+            f.write(conftest_content)
+        print(f"Content of {conftest_file_path}:\n{conftest_content}")
         
         # Create a directory for the HTML report
         report_dir = TEMP_DIR / "report"
@@ -128,13 +167,17 @@ async def run_test(background_tasks: BackgroundTasks, test_script: str = Form(..
         result = subprocess.run(
             [
                 "pytest", 
-                str(test_file_path), 
+                str(TEMP_DIR), # Add TEMP_DIR to pytest arguments to ensure discovery
+                str(test_file_path),
                 "--html=" + str(report_dir / "report.html"),
                 "--self-contained-html",
-                "-v"
+                "-v",
+                "--import-mode=importlib" # Ensure pytest can import modules from the test file's directory
             ],
             capture_output=True,
-            text=True
+            text=True,
+            cwd=TEMP_DIR.absolute(), # Run pytest in the temporary directory
+            env={"PYTHONPATH": str(TEMP_DIR.absolute()), **os.environ} # Add TEMP_DIR to PYTHONPATH
         )
         
         # Check if the HTML report was generated
@@ -177,16 +220,16 @@ async def download_report():
 
 @app.get("/download-script")
 async def download_script():
-    script_path = TEMP_DIR / "test_script.py"
+    script_path = TEMP_DIR / "test_selenium_script.py"
     if not script_path.exists():
         raise HTTPException(status_code=404, detail="Test script not found")
     
     return FileResponse(
         path=script_path,
-        filename="test_script.py",
+        filename="test_selenium_script.py",
         media_type="text/x-python"
     )
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000)
