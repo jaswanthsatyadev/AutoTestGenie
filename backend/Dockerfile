@@ -14,13 +14,18 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean
 
 # Install ChromeDriver
-RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}' | cut -d. -f1) \
-    && CHROMEDRIVER_VERSION=$(wget -qO- https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION) \
-    && wget https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip \
-    && unzip chromedriver_linux64.zip \
-    && mv chromedriver /usr/local/bin/ \
+RUN apt-get update -y && apt-get install -y wget unzip jq curl \
+    && CHROME_DRIVER_URL=$(curl -sS "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json" | \
+    jq -r '.channels.Stable.downloads.chromedriver[] | select(.platform == "linux64") | .url') \
+    && echo "Downloading from: $CHROME_DRIVER_URL" \
+    && wget --continue -O /tmp/chromedriver_linux64.zip "$CHROME_DRIVER_URL" \
+    && unzip /tmp/chromedriver_linux64.zip -d /tmp \
+    && DRIVER_DIR=$(find /tmp -type d -name "chromedriver-linux64*") \
+    && mv "$DRIVER_DIR/chromedriver" /usr/local/bin/chromedriver \
     && chmod +x /usr/local/bin/chromedriver \
-    && rm chromedriver_linux64.zip
+    && rm /tmp/chromedriver_linux64.zip \
+    && rm -rf "$DRIVER_DIR" \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install dependencies
 COPY requirements.txt .

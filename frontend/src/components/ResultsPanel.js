@@ -5,6 +5,8 @@ import { vscDarkPlus, vs } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 function ResultsPanel({ results, loading, error }) {
   const { darkMode } = useContext(ThemeContext);
+  const [activeTab, setActiveTab] = React.useState('Test Script');
+  const [copied, setCopied] = React.useState(false);
 
   if (loading) {
     return (
@@ -36,14 +38,14 @@ function ResultsPanel({ results, loading, error }) {
 
   if (!results) {
     return (
-      <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white shadow'}`}>
-        <div className="flex flex-col items-center justify-center h-full py-12">
-          <svg className="h-16 w-16 text-indigo-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+      <div className={`rounded-2xl shadow-lg transition-shadow duration-300 ${darkMode ? 'bg-gray-800/50 shadow-indigo-500/10' : 'bg-white/50 shadow-gray-900/10'}`}>
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+           <svg className="h-16 w-16 text-indigo-400 mb-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
           </svg>
-          <h3 className={`text-xl font-semibold mb-2 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Ready to Generate Tests</h3>
-          <p className={`text-center ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-            Fill out the form on the left and click "Generate Test Script" to create and run automated tests.
+          <h3 className="text-2xl font-bold tracking-tight mb-2">Ready to Generate</h3>
+          <p className={`max-w-md mx-auto ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            Fill out the form and click "Generate Test Script" to see the magic happen.
           </p>
         </div>
       </div>
@@ -52,78 +54,74 @@ function ResultsPanel({ results, loading, error }) {
 
   const { testScript, runResults } = results;
 
-  return (
-    <div className={`p-6 rounded-lg ${darkMode ? 'bg-gray-800' : 'bg-white shadow'}`}>
-      <h2 className={`text-xl font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-        Test Results
-      </h2>
+  const handleCopy = () => {
+    const contentToCopy = activeTab === 'Test Script' ? testScript : runResults?.stdout;
+    navigator.clipboard.writeText(contentToCopy);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
-      <div className="space-y-6">
-        {/* Console Output */}
-        <div>
-          <h3 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-            Console Output
-          </h3>
-          <div className={`rounded-md overflow-auto ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`} style={{ maxHeight: '200px' }}>
-            <pre className={`p-4 text-sm ${darkMode ? 'text-gray-300' : 'text-gray-800'}`}>
-              {runResults?.stdout || 'No output available'}
-              {runResults?.stderr && (
-                <span className="text-red-500">
-                  \n\n{runResults.stderr}
-                </span>
-              )}
-            </pre>
+ return (
+    <div className={`rounded-2xl shadow-lg transition-shadow duration-300 ${darkMode ? 'bg-gray-800/50 shadow-indigo-500/10' : 'bg-white/50 shadow-gray-900/10'}`}>
+      <div className="p-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold tracking-tight">Results</h2>
+        </div>
+
+        <div className="mb-6">
+          <div className={`flex space-x-1 rounded-lg p-1 ${darkMode ? 'bg-gray-900/50' : 'bg-gray-200/80'}`}>
+            {['Test Script', 'Console Output'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`w-full rounded-md py-2.5 text-sm font-medium leading-5 transition-colors duration-300 ${activeTab === tab ? (darkMode ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-700 shadow') : (darkMode ? 'text-gray-300 hover:bg-white/[0.12]' : 'text-gray-600 hover:bg-white/50')}`}>
+                {tab}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Test Script */}
-        <div>
-          <h3 className={`text-lg font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-            Generated Test Script
-          </h3>
-          <div className="rounded-md overflow-auto" style={{ maxHeight: '300px' }}>
-            <SyntaxHighlighter 
-              language="python" 
-              style={darkMode ? vscDarkPlus : vs}
-              showLineNumbers
-              wrapLines
-            >
-              {testScript}
-            </SyntaxHighlighter>
+        <div className="bg-gray-900/80 rounded-lg text-white font-mono text-sm relative backdrop-blur-sm" style={{ minHeight: '300px', maxHeight: '50vh', overflow: 'auto'}}> 
+          <button 
+            onClick={handleCopy}
+            className="absolute top-3 right-3 bg-gray-700/50 hover:bg-gray-600/50 text-white font-bold py-1 px-3 rounded-md text-xs transition-colors duration-300 z-10"
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+          <div className="overflow-auto h-full w-full p-4">
+            {activeTab === 'Test Script' ? (
+              <SyntaxHighlighter language="python" style={darkMode ? vscDarkPlus : vs} showLineNumbers wrapLines customStyle={{background: 'transparent', padding: 0}}>
+                {testScript}
+              </SyntaxHighlighter>
+            ) : (
+              <pre className="whitespace-pre-wrap">
+                {runResults?.stdout || 'No output available'}
+                {runResults?.stderr && <span className="text-red-400">\n\n{runResults.stderr}</span>}
+              </pre>
+            )}
           </div>
         </div>
-
-        {/* Download Links */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          {runResults?.report_url && (
-            <a
+        
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <a 
               href={`http://localhost:8000${runResults.report_url}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+              className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-all duration-300 transform hover:scale-105 text-center ${darkMode ? 'bg-green-600 hover:bg-green-500 shadow-lg shadow-green-600/30' : 'bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/40'} ${!runResults?.report_url ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <svg className="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Download HTML Report
+              View Report
             </a>
-          )}
-
-          {runResults?.test_script_url && (
-            <a
+            <a 
               href={`http://localhost:8000${runResults.test_script_url}`}
-              download="test_script.py"
-              className="flex-1 flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              download
+              className={`w-full py-3 px-4 rounded-lg font-semibold text-white transition-all duration-300 transform hover:scale-105 text-center ${darkMode ? 'bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-600/30' : 'bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/40'} ${!runResults?.test_script_url ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
-              <svg className="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Download Test Script
+              Download Script
             </a>
-          )}
         </div>
       </div>
     </div>
+
   );
 }
 

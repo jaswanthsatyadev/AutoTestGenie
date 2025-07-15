@@ -63,6 +63,11 @@ async def generate_test(url: str = Form(...),
         # Create the prompt for Gemini
         prompt = f"""
         Generate a Python script using Selenium and Pytest to automate testing for a web page.
+
+        You can use the following libraries:
+        - pytest
+        - selenium
+        - faker
         
         URL: {url}
         
@@ -76,20 +81,34 @@ async def generate_test(url: str = Form(...),
         
         Requirements:
         1. Use Selenium WebDriver with Chrome
-        2. Use Pytest as the testing framework
-        3. Include proper assertions to verify actions
-        4. Handle potential errors gracefully
-        5. Add comments explaining the test steps
-        6. Make the code clean, readable, and maintainable
-        7. Include setup and teardown methods
-        8. Use explicit waits where appropriate
+        2. Configure Chrome options with:
+           - `--headless`
+           - `--no-sandbox`
+           - `--disable-dev-shm-usage`
+           - `--disable-gpu`
+           - `--window-size=1920,1080`
+           - `--remote-debugging-port=9222`
+        3. Use Pytest as the testing framework
+        4. Include proper assertions to verify actions
+        5. Handle potential errors gracefully
+        6. Add comments explaining the test steps
+        7. Make the code clean, readable, and maintainable
+        8. Include setup and teardown methods (e.g., using pytest fixtures)
+        9. Use explicit waits (e.g., `WebDriverWait`) instead of implicit waits
         
         Return ONLY the Python code without any explanations. Ensure the script is a valid pytest test file and includes at least one function starting with `def test_`.
         """
         
         # Generate the test script
-        response = model.generate_content(prompt)
-        test_script = response.text
+        try:
+            response = model.generate_content(prompt, stream=True)
+            
+            test_script = ""
+            for chunk in response:
+                test_script += chunk.text
+        except Exception as e:
+            print(f"Error during Gemini API call: {e}")
+            raise HTTPException(status_code=500, detail="Error communicating with Generative AI service")
         
         # Clean up the response to extract only the Python code
         if "```python" in test_script:
@@ -150,6 +169,9 @@ def driver():
     options.add_argument('--headless')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--window-size=1920,1080')
+    options.add_argument('--remote-debugging-port=9222')
     driver = webdriver.Chrome(options=options)
     yield driver
     driver.quit()
@@ -166,18 +188,14 @@ def driver():
         # Run pytest with HTML report generation
         result = subprocess.run(
             [
-                "pytest", 
-                str(TEMP_DIR), # Add TEMP_DIR to pytest arguments to ensure discovery
-                str(test_file_path),
-                "--html=" + str(report_dir / "report.html"),
+                "pytest",
+                str(test_file_path.name),
+                f"--html={report_dir / 'report.html'}",
                 "--self-contained-html",
-                "-v",
-                "--import-mode=importlib" # Ensure pytest can import modules from the test file's directory
             ],
             capture_output=True,
             text=True,
-            cwd=TEMP_DIR.absolute(), # Run pytest in the temporary directory
-            env={"PYTHONPATH": str(TEMP_DIR.absolute()), **os.environ} # Add TEMP_DIR to PYTHONPATH
+            cwd=str(TEMP_DIR.absolute()),
         )
         
         # Check if the HTML report was generated
